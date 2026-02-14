@@ -1,11 +1,17 @@
 ###############################################################################
-# Instructor materials
+# Instructor notes (do not give to students)
 ###############################################################################
-cat > "$GAME_DIR/INSTRUCTOR_KEY.txt" <<'EOF'
-INSTRUCTOR KEY (do not give to students)
 
-Core intended flow (commands may vary):
+Time plan (~15 mins)
 
+Dependencies: #################################################################
+-cowsay is optional. The garden script will fall back to plain text if missing.
+-might need to run dos2unix on setup script before running
+
+Suggested command set in notes: ###############################################
+pwd, ls, cd, cat, mkdir, cp, mv, rm, ./script.sh, wildcards
+
+Core intended flow (commands may vary): #######################################
 1) cd terminal_trial_fun
 2) cat START.txt
 3) cd garden
@@ -26,25 +32,10 @@ Core intended flow (commands may vary):
 13) cd chest
 14) cat treasure.txt
 
-Quick checks:
+Quick checks: #################################################################
 - terminal_trial_fun/backpack exists
 - terminal_trial_fun/backpack/scroll.txt exists
 - terminal_trial_fun/cave has map.txt and scroll.txt (optional)
 - terminal_trial_fun/tower/chest/treasure.txt exists
-EOF
-
-cat > "$GAME_DIR/README_TEACHER.txt" <<'EOF'
-Teacher notes
-
-Time plan (~15 mins)
-
-Dependencies:
-cowsay is optional. The garden script will fall back to plain text if missing.
-
-Suggested command set in notes:
-pwd, ls, cd, cat, mkdir, cp, mv, rm, ./script.sh, wildcards
-
-
-EOF
 
 ###############################################################################
