@@ -4,4 +4,4 @@ This workshop will cover common components of the RNA-seq workflow, including ex
 
 <img width="1077" height="926" alt="image" src="https://github.com/user-attachments/assets/785eafc0-e02f-45dc-aa28-19a72500bd8b" />
 
-# Instructor: Bernadette Johnson
+Instructor for the workshop: Bernadette Johnson
