@@ -9,4 +9,4 @@ mkdir -p ~/03_hisat2/hisat2_index
 cd ~/03_hisat2/hisat2_index
 
 #Check that your genome is located in the correct path
-hisat2-build ~/genome/*.fna genome_index &>> HISAT2_build.log
+hisat2-build ~/genome/*.fna genome_index
