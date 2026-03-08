@@ -6,6 +6,7 @@
 # Can call program from shared directory
 STRINGTIE_DIR="/home/workshop/stringtie"
 GENOME_DIR="/home/workshop/genome"
+ANNOTATION_GFF="$GENOME_DIR/genomic.gff"
 
 INPUT_DIR="/home/ubuntu/04_sortedbam"
 OUTPUT_DIR="/home/ubuntu/05_stringtie"
@@ -13,10 +14,6 @@ LOG_DIR="/home/ubuntu/05_stringtie/logs"
 
 # Set number of threads
 THREADS=3 
-
-# Define annotation and prepDE script
-ANNOTATION_GFF="$GENOME_DIR/genomic.gff"
-PREPDE="$STRINGTIE_DIR/prepDE.py3"
 
 # Create output and log directories ----
 mkdir -p "$OUTPUT_DIR" "$LOG_DIR"
@@ -82,10 +79,12 @@ run_stringtie_after_merge() {
 	date
 }
 
+# Order the run of functions with a function --------
 main() {
     run_stringtie_before_merge
     run_stringtie_merge
     run_stringtie_after_merge
 }
 
+# Execute the function main ---------
 main "$@"
