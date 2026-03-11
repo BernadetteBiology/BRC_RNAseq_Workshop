@@ -1,0 +1,201 @@
+# BRC RNA-seq Workshop (edgeR): artificial batch effect + correction -------
+# This script demonstrates:
+# 1. loading a count matrix
+# 2. defining biological groups
+# 3. creating an artificial batch effect ("sequencing lane")
+# 4. visualizing the artificial batch effect with MDS
+# 5. correcting for batch in edgeR by including batch in the design matrix
+# 6. testing CNP vs CP while accounting for lane
+
+# SETUP --------------------------------------------------------------------
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("edgeR")
+
+library(edgeR)
+
+# LOAD GENE COUNT MATRIX ---------------------------------------------------
+pipefish_data <- read.csv(
+  file = "gene_count_matrix.csv",
+  stringsAsFactors = FALSE,
+  row.names = 1,
+  header = TRUE
+)
+
+# CHECK DATA ---------------------------------------------------------------
+head(pipefish_data, 5)
+colnames(pipefish_data)
+dim(pipefish_data)
+
+# METADATA: biological condition ------------------------------------------
+sample_info <- c(
+  Control1_NP = "CNP",
+  Control2_NP = "CNP",
+  Control3_NP = "CNP",
+  Control4_NP = "CNP",
+  
+  Control1_P  = "CP",
+  Control2_P  = "CP",
+  Control3_P  = "CP",
+  Control4_P  = "CP",
+  
+  EE1_P       = "EP",
+  EE2_P       = "EP",
+  EE3_P       = "EP",
+  EE4_P       = "EP"
+)
+
+group <- factor(sample_info[colnames(pipefish_data)])
+table(group)
+
+# ORIGINAL DGEList ---------------------------------------------------------
+y_orig <- DGEList(counts = pipefish_data, group = group)
+
+# ORIGINAL MDS -------------------------------------------------------------
+plotMDS(y_orig,
+        labels = colnames(y_orig),
+        col = as.numeric(group),
+        main = "Original MDS plot")
+
+legend("bottomleft",
+       legend = levels(group),
+       col = 1:length(levels(group)),
+       pch = 16,
+       cex = 0.8)
+
+# -------------------------------------------------------------------------
+# CREATE AN ARTIFICIAL BATCH EFFECT
+# -------------------------------------------------------------------------
+
+# Copy original data
+pipefish_data_batch <- pipefish_data
+
+# Fake sequencing lane assignment
+lane <- factor(c(
+  "Lane1","Lane1","Lane2","Lane2",
+  "Lane1","Lane1","Lane2","Lane2",
+  "Lane1","Lane1","Lane2","Lane2"
+))
+
+# Make sure lane names match the sample names
+names(lane) <- colnames(pipefish_data_batch)
+
+table(lane)
+
+# Create an artificial batch effect
+set.seed(123)
+
+# Affect 50% of genes
+batch_genes <- sample(
+  rownames(pipefish_data_batch),
+  size = round(0.5 * nrow(pipefish_data_batch))
+)
+
+# Get the Lane2 sample names
+lane2_samples <- names(lane)[lane == "Lane2"]
+
+# Multiply those genes in Lane2 samples to create a technical shift
+pipefish_data_batch[batch_genes, lane2_samples] <-
+  round(pipefish_data_batch[batch_genes, lane2_samples] * 2)
+
+# Create a new DGEList using the batch-altered data
+y_batch <- DGEList(counts = pipefish_data_batch, group = group)
+
+# MDS colored by artificial lane
+plotMDS(y_batch,
+        labels = colnames(y_batch),
+        col = as.numeric(lane),
+        main = "MDS plot with artificial batch effect")
+
+legend("bottomleft",
+       legend = levels(lane),
+       col = 1:length(levels(lane)),
+       pch = 16,
+       cex = 0.8)
+
+# -------------------------------------------------------------------------
+# PAIRWISE DE ANALYSIS: CP vs CNP ONLY
+# while accounting for artificial batch (lane)
+# -------------------------------------------------------------------------
+
+# Keep only CP and CNP samples
+keep_samples <- group %in% c("CP", "CNP")
+
+y_pair <- y_batch[, keep_samples]
+group_pair <- droplevels(group[keep_samples])
+lane_pair  <- droplevels(lane[keep_samples])
+
+# Update group information inside DGEList
+y_pair$samples$group <- group_pair
+
+table(group_pair)
+table(lane_pair)
+
+# FILTER LOW-COUNT GENES ---------------------------------------------------
+keep_genes <- filterByExpr(y_pair, group = group_pair)
+y_pair <- y_pair[keep_genes, , keep.lib.sizes = FALSE]
+
+cat("Genes retained after filtering:", nrow(y_pair), "\n")
+
+# TMM NORMALIZATION --------------------------------------------------------
+y_pair <- normLibSizes(y_pair)
+y_pair$samples
+
+# -------------------------------------------------------------------------
+# MODEL 1: IGNORING BATCH
+# -------------------------------------------------------------------------
+# This is if we do not account for the batch term.
+
+group_pair <- relevel(group_pair, ref = "CP")
+
+design_nobatch <- model.matrix(~ group_pair)
+colnames(design_nobatch)
+
+y_nobatch <- estimateDisp(y_pair, design_nobatch)
+fit_nobatch <- glmQLFit(y_nobatch, design_nobatch)
+qlf_nobatch <- glmQLFTest(fit_nobatch, coef = 2)
+
+topTags(qlf_nobatch)
+
+results_nobatch <- topTags(qlf_nobatch, n = Inf)$table
+sum(results_nobatch$FDR < 0.05)
+
+# -------------------------------------------------------------------------
+# MODEL 2: ACCOUNTING FOR BATCH
+# -------------------------------------------------------------------------
+# This is the correct model for this teaching example.
+# We include lane as a covariate so edgeR adjusts for it statistically.
+
+design_batch <- model.matrix(~ lane_pair + group_pair)
+colnames(design_batch)
+design_batch
+
+y_batchcorr <- estimateDisp(y_pair, design_batch)
+
+plotBCV(y_batchcorr)
+
+fit_batchcorr <- glmQLFit(y_batchcorr, design_batch)
+
+# In this design:
+# intercept = baseline (Lane1, CP)
+# lane_pairLane2 = lane effect
+# group_pairCNP = CNP vs CP after accounting for lane
+qlf_batchcorr <- glmQLFTest(fit_batchcorr, coef = "group_pairCNP")
+
+topTags(qlf_batchcorr)
+
+results_batchcorr <- topTags(qlf_batchcorr, n = Inf)$table
+sum(results_batchcorr$FDR < 0.05)
+
+# SAVE RESULTS -------------------------------------------------------------
+#write.csv(results_nobatch, file = "pipefish_CP_vs_CNP_no_batch_correction.csv")
+
+#write.csv(results_batchcorr, file = "pipefish_CP_vs_CNP_with_batch_correction.csv")
+
+
+# COMPARISON OF RESULTS ------------------------------------------------------
+
+cat("DE genes without batch correction (FDR < 0.05):",
+    sum(results_nobatch$FDR < 0.05), "\n")
+
+cat("DE genes with batch correction (FDR < 0.05):",
+    sum(results_batchcorr$FDR < 0.05), "\n")
